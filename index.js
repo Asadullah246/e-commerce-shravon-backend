@@ -5,6 +5,7 @@ const cors = require("cors");
 require("dotenv").config();
 const path = require("path");
 const multer = require("multer");
+const SSLCommerzPayment = require("sslcommerz-lts");
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const port = process.env.PORT || 5000;
 
@@ -45,6 +46,13 @@ const storage = multer.diskStorage({
 });
 
 const upload = multer({ storage: storage });
+
+const paymentUrl = "http://localhost:5000";
+
+const store_id = process.env.STORE_ID;
+const store_passwd = process.env.STORE_PASS;
+
+const is_live = false;
 
 async function run() {
   try {
@@ -143,12 +151,6 @@ async function run() {
 
 
 
-
-
-
-
-
-
     // cart -----------------------------------------------------
 
     app.post("/CartProduct", async (req, res) => {
@@ -179,12 +181,71 @@ async function run() {
       res.send(Product);
     });
 
+    // orders ----------------------------------------------------------
+
+
     app.post("/OrderProduct", async (req, res) => {
-      //post the value on server
-      const product = req.body;
-      const result = await OrderCollection.insertOne(product);
-      res.send(result);
-    });
+
+        const body = req.body;
+        delete body._id;
+        const unId = new ObjectId().toString();
+        const data = {
+          total_amount: Number(body.totalprice),
+          currency: "BDT",
+          tran_id: unId, // use unique tran_id for each api call
+          success_url: `${paymentUrl}/payment/success/${unId}`,
+          fail_url: `${paymentUrl}/payment/fail/${unId}`,
+          cancel_url: `${paymentUrl}/payment/cancel/${unId}`,
+          // fail_url: 'http://localhost:3030/fail',
+          // cancel_url: 'http://localhost:3030/cancel',
+          ipn_url: `${paymentUrl}/ipn`,
+          // ipn_url: "http://localhost:3030/ipn",
+          shipping_method: "Courier",
+          product_name: "Computer.",
+          product_category: "Electronic",
+          product_profile: "general",
+          cus_name: "Customer Name",
+          cus_email: "customer@example.com",
+          cus_add1: "Dhaka",
+          cus_add2: "Dhaka",
+          cus_city: "Dhaka",
+          cus_state: "Dhaka",
+          cus_postcode: "1000",
+          cus_country: "Bangladesh",
+          cus_phone: "01711111111",
+          cus_fax: "01711111111",
+          ship_name: "Customer Name",
+          ship_add1: "Dhaka",
+          ship_add2: "Dhaka",
+          ship_city: "Dhaka",
+          ship_state: "Dhaka",
+          ship_postcode: 1000,
+          ship_country: "Bangladesh",
+        };
+
+        const neworder = await OrderCollection.insertOne({
+          ...body,
+          delivered: "pending",
+        });
+
+
+
+        const sslcz = new SSLCommerzPayment(store_id, store_passwd, is_live);
+        sslcz.init(data).then((apiResponse) => {
+          // Redirect the user to payment gateway
+          let GatewayPageURL = apiResponse.GatewayPageURL;
+          console.log("Redirecting to: ", GatewayPageURL);
+          res.send({ url: GatewayPageURL });
+        });
+      });
+
+      app.post("/payment/success/:unId", async (req, res) => {
+        const id = req.params.unId;
+        console.log("id", id);
+
+        // res.send(newBlog);
+        res.redirect(`http://localhost:3000/success`);
+      });
 
     app.get("/OrderProduct", async (req, res) => {
       const Product = OrderCollection.find({});
