@@ -144,6 +144,20 @@ async function run() {
       const msg = await messageCollection.findOne(quary);
       res.send(msg);
     });
+    app.get("/messages", async (req, res) => {
+      //get the value from server
+      const quary = {};
+      const cursor = messageCollection.find(quary);
+      const Products = await cursor.toArray();
+      res.send(Products);
+    });
+
+    app.delete("/messages/:id", async (req, res) => {
+      const id = req.params.id;
+      const quary = { _id: new ObjectId(id) }; 
+      const Product = await messageCollection.deleteOne(quary);
+      res.send(Product);
+    });
 
     // messages
     // admin ---------------------------------------------------
